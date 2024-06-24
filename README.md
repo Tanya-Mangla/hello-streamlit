@@ -1,8 +1,9 @@
-# 🏗️ ML model builder template
+# 🏗️ Welcome to Data Analaysis App
 
-A simple Streamlit app that lets you build simple ML models with scikit-learn. 
+# Analyzer_APP
+This is a text analysis app that allows you to perform sentiment analysis and emotion analysis on text data. You can choose the analysis type and upload text either manually or via a CSV file. After analysis, the results will be displayed along with statistical information and visualizations.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ml-model-builder-template.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data.analysis.streamlit.app/)
 
 ### How to run it on your own machine
 

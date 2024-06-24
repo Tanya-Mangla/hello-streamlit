@@ -1,249 +1,186 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-import altair as alt
-import time
-import zipfile
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+import matplotlib.pyplot as plt
 
-# Page title
-st.set_page_config(page_title='ML model builder', page_icon='🏗️')
-st.title('🏗️ ML model builder')
+# Ensure you have the NLTK data
+nltk.download('vader_lexicon')
 
-with st.expander('About this app'):
-  st.markdown('**What can this app do?**')
-  st.info('This app allow users to build a machine learning (ML) model in an end-to-end workflow. Particularly, this encompasses data upload, data pre-processing, ML model building and post-model analysis.')
+# Function for authenticating user
+def authenticate(username, password):
+    return username in st.session_state['users'] and st.session_state['users'][username] == password
 
-  st.markdown('**How to use the app?**')
-  st.warning('To engage with the app, go to the sidebar and 1. Select a data set and 2. Adjust the model parameters by adjusting the various slider widgets. As a result, this would initiate the ML model building process, display the model results as well as allowing users to download the generated models and accompanying data.')
+# Function for sign-up (save user credentials)
+def signup(username, password):
+    st.session_state['users'][username] = password
 
-  st.markdown('**Under the hood**')
-  st.markdown('Data sets:')
-  st.code('''- Drug solubility data set
-  ''', language='markdown')
-  
-  st.markdown('Libraries used:')
-  st.code('''- Pandas for data wrangling
-- Scikit-learn for building a machine learning model
-- Altair for chart creation
-- Streamlit for user interface
-  ''', language='markdown')
+# Initialize session state for users if not already done
+if 'users' not in st.session_state:
+    st.session_state['users'] = {}
 
+# Initialize session state for login status
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
 
-# Sidebar for accepting input parameters
-with st.sidebar:
-    # Load data
-    st.header('1.1. Input data')
+# Login/Sign-Up form
+if not st.session_state['logged_in']:
+    st.title("Welcome to the Data Analysis App")
+    choice = st.selectbox("Login or Sign Up", ["Login", "Sign Up"])
 
-    st.markdown('**1. Use custom data**')
-    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file, index_col=False)
-      
-    # Download example data
-    @st.cache_data
-    def convert_df(input_df):
-        return input_df.to_csv(index=False).encode('utf-8')
-    example_csv = pd.read_csv('https://raw.githubusercontent.com/dataprofessor/data/master/delaney_solubility_with_descriptors.csv')
-    csv = convert_df(example_csv)
-    st.download_button(
-        label="Download example CSV",
-        data=csv,
-        file_name='delaney_solubility_with_descriptors.csv',
-        mime='text/csv',
-    )
+    if choice == "Login":
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if authenticate(username, password):
+                st.success("Logged In Successfully")
+                st.session_state['logged_in'] = True
+                st.session_state['username'] = username
+            else:
+                st.error("Invalid Username or Password")
 
-    # Select example data
-    st.markdown('**1.2. Use example data**')
-    example_data = st.toggle('Load example data')
-    if example_data:
-        df = pd.read_csv('https://raw.githubusercontent.com/dataprofessor/data/master/delaney_solubility_with_descriptors.csv')
+    elif choice == "Sign Up":
+        username = st.text_input("New Username")
+        password = st.text_input("New Password", type="password")
+        if st.button("Sign Up"):
+            if username in st.session_state['users']:
+                st.error("Username already exists")
+            else:
+                signup(username, password)
+                st.success("User Registered Successfully")
 
-    st.header('2. Set Parameters')
-    parameter_split_size = st.slider('Data split ratio (% for Training Set)', 10, 90, 80, 5)
+if st.session_state['logged_in']:
+    sia = SentimentIntensityAnalyzer()
 
-    st.subheader('2.1. Learning Parameters')
-    with st.expander('See parameters'):
-        parameter_n_estimators = st.slider('Number of estimators (n_estimators)', 0, 1000, 100, 100)
-        parameter_max_features = st.select_slider('Max features (max_features)', options=['all', 'sqrt', 'log2'])
-        parameter_min_samples_split = st.slider('Minimum number of samples required to split an internal node (min_samples_split)', 2, 10, 2, 1)
-        parameter_min_samples_leaf = st.slider('Minimum number of samples required to be at a leaf node (min_samples_leaf)', 1, 10, 2, 1)
+    def analyze_text(text, analysis_type):
+        scores = sia.polarity_scores(text)
+        if analysis_type == 'Sentiment Analysis':
+            if scores['compound'] >= 0.05:
+                sentiment = 'Positive'
+            elif scores['compound'] <= -0.05:
+                sentiment = 'Negative'
+            else:
+                sentiment = 'Neutral'
+            return sentiment
+        elif analysis_type == 'Emotion Analysis':
+            if scores['compound'] >= 0.6:
+                emotion = 'Very Good'
+            elif 0.2 <= scores['compound'] < 0.6:
+                emotion = 'Good'
+            elif -0.2 <= scores['compound'] < 0.2:
+                emotion = 'Neutral'
+            elif -0.6 <= scores['compound'] < -0.2:
+                emotion = 'Bad'
+            else:
+                emotion = 'Very Bad'
+            return emotion
 
-    st.subheader('2.2. General Parameters')
-    with st.expander('See parameters', expanded=False):
-        parameter_random_state = st.slider('Seed number (random_state)', 0, 1000, 42, 1)
-        parameter_criterion = st.select_slider('Performance measure (criterion)', options=['squared_error', 'absolute_error', 'friedman_mse'])
-        parameter_bootstrap = st.select_slider('Bootstrap samples when building trees (bootstrap)', options=[True, False])
-        parameter_oob_score = st.select_slider('Whether to use out-of-bag samples to estimate the R^2 on unseen data (oob_score)', options=[False, True])
+    def display_dashboard(data):
+        st.subheader('Analysis Results')
+        st.write(data)
 
-    sleep_time = st.slider('Sleep time', 0, 3, 0)
+        st.subheader('Statistics')
+        st.write(data.describe())
 
-# Initiate the model building process
-if uploaded_file or example_data: 
-    with st.status("Running ...", expanded=True) as status:
-    
-        st.write("Loading data ...")
-        time.sleep(sleep_time)
+        st.subheader('Charts')
+        fig, ax = plt.subplots()
+        data['analysis'].value_counts().plot(kind='bar', ax=ax)
+        st.pyplot(fig)
 
-        st.write("Preparing data ...")
-        time.sleep(sleep_time)
-        X = df.iloc[:,:-1]
-        y = df.iloc[:,-1]
-            
-        st.write("Splitting data ...")
-        time.sleep(sleep_time)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=(100-parameter_split_size)/100, random_state=parameter_random_state)
-    
-        st.write("Model training ...")
-        time.sleep(sleep_time)
+        st.subheader('Download Results')
+        # Ensure all data is converted to string before saving
+        data = data.astype(str)
+        csv = data.to_csv(index=False).encode('utf-8')
+        st.download_button(label='Download CSV', data=csv, file_name='results.csv', mime='text/csv')
 
-        if parameter_max_features == 'all':
-            parameter_max_features = None
-            parameter_max_features_metric = X.shape[1]
-        
-        rf = RandomForestRegressor(
-                n_estimators=parameter_n_estimators,
-                max_features=parameter_max_features,
-                min_samples_split=parameter_min_samples_split,
-                min_samples_leaf=parameter_min_samples_leaf,
-                random_state=parameter_random_state,
-                criterion=parameter_criterion,
-                bootstrap=parameter_bootstrap,
-                oob_score=parameter_oob_score)
-        rf.fit(X_train, y_train)
-        
-        st.write("Applying model to make predictions ...")
-        time.sleep(sleep_time)
-        y_train_pred = rf.predict(X_train)
-        y_test_pred = rf.predict(X_test)
-            
-        st.write("Evaluating performance metrics ...")
-        time.sleep(sleep_time)
-        train_mse = mean_squared_error(y_train, y_train_pred)
-        train_r2 = r2_score(y_train, y_train_pred)
-        test_mse = mean_squared_error(y_test, y_test_pred)
-        test_r2 = r2_score(y_test, y_test_pred)
-        
-        st.write("Displaying performance metrics ...")
-        time.sleep(sleep_time)
-        parameter_criterion_string = ' '.join([x.capitalize() for x in parameter_criterion.split('_')])
-        #if 'Mse' in parameter_criterion_string:
-        #    parameter_criterion_string = parameter_criterion_string.replace('Mse', 'MSE')
-        rf_results = pd.DataFrame(['Random forest', train_mse, train_r2, test_mse, test_r2]).transpose()
-        rf_results.columns = ['Method', f'Training {parameter_criterion_string}', 'Training R2', f'Test {parameter_criterion_string}', 'Test R2']
-        # Convert objects to numerics
-        for col in rf_results.columns:
-            rf_results[col] = pd.to_numeric(rf_results[col], errors='ignore')
-        # Round to 3 digits
-        rf_results = rf_results.round(3)
-        
-    status.update(label="Status", state="complete", expanded=False)
+    def main():
+        st.title('Text Analysis App')
 
-    # Display data info
-    st.header('Input data', divider='rainbow')
-    col = st.columns(4)
-    col[0].metric(label="No. of samples", value=X.shape[0], delta="")
-    col[1].metric(label="No. of X variables", value=X.shape[1], delta="")
-    col[2].metric(label="No. of Training samples", value=X_train.shape[0], delta="")
-    col[3].metric(label="No. of Test samples", value=X_test.shape[0], delta="")
-    
-    with st.expander('Initial dataset', expanded=True):
-        st.dataframe(df, height=210, use_container_width=True)
-    with st.expander('Train split', expanded=False):
-        train_col = st.columns((3,1))
-        with train_col[0]:
-            st.markdown('**X**')
-            st.dataframe(X_train, height=210, hide_index=True, use_container_width=True)
-        with train_col[1]:
-            st.markdown('**y**')
-            st.dataframe(y_train, height=210, hide_index=True, use_container_width=True)
-    with st.expander('Test split', expanded=False):
-        test_col = st.columns((3,1))
-        with test_col[0]:
-            st.markdown('**X**')
-            st.dataframe(X_test, height=210, hide_index=True, use_container_width=True)
-        with test_col[1]:
-            st.markdown('**y**')
-            st.dataframe(y_test, height=210, hide_index=True, use_container_width=True)
+        # About Section
+        st.sidebar.subheader('About')
+        st.sidebar.info(
+            "This is a text analysis app that allows you to perform sentiment analysis "
+            "and emotion analysis on text data. You can choose the analysis type and "
+            "upload text either manually or via a CSV file. After analysis, the results "
+            "will be displayed along with statistical information and visualizations."
+        )
+        st.sidebar.subheader('How to Use')
+        st.sidebar.markdown(
+            """
+            - Choose the analysis type from the sidebar options.
+            - Select either 'Text Input' to manually enter text or 'CSV File' to upload a CSV file.
+            - For 'Text Input', type or paste the text into the text area and click 'Analyze'.
+            - For 'CSV File', upload a CSV file containing a 'text' column for analysis.
+            - After analysis, explore the results, statistics, and charts.
+            - You can also download the results as a CSV file.
+            """
+        )
 
-    # Zip dataset files
-    df.to_csv('dataset.csv', index=False)
-    X_train.to_csv('X_train.csv', index=False)
-    y_train.to_csv('y_train.csv', index=False)
-    X_test.to_csv('X_test.csv', index=False)
-    y_test.to_csv('y_test.csv', index=False)
-    
-    list_files = ['dataset.csv', 'X_train.csv', 'y_train.csv', 'X_test.csv', 'y_test.csv']
-    with zipfile.ZipFile('dataset.zip', 'w') as zipF:
-        for file in list_files:
-            zipF.write(file, compress_type=zipfile.ZIP_DEFLATED)
+        st.sidebar.title('Options')
+        analysis_type = st.sidebar.selectbox('Choose Analysis Type', ['Sentiment Analysis', 'Emotion Analysis'])
+        upload_type = st.sidebar.selectbox('Upload Type', ['Text Input', 'CSV File'])
 
-    with open('dataset.zip', 'rb') as datazip:
-        btn = st.download_button(
-                label='Download ZIP',
-                data=datazip,
-                file_name="dataset.zip",
-                mime="application/octet-stream"
-                )
-    
-    # Display model parameters
-    st.header('Model parameters', divider='rainbow')
-    parameters_col = st.columns(3)
-    parameters_col[0].metric(label="Data split ratio (% for Training Set)", value=parameter_split_size, delta="")
-    parameters_col[1].metric(label="Number of estimators (n_estimators)", value=parameter_n_estimators, delta="")
-    parameters_col[2].metric(label="Max features (max_features)", value=parameter_max_features_metric, delta="")
-    
-    # Display feature importance plot
-    importances = rf.feature_importances_
-    feature_names = list(X.columns)
-    forest_importances = pd.Series(importances, index=feature_names)
-    df_importance = forest_importances.reset_index().rename(columns={'index': 'feature', 0: 'value'})
-    
-    bars = alt.Chart(df_importance).mark_bar(size=40).encode(
-             x='value:Q',
-             y=alt.Y('feature:N', sort='-x')
-           ).properties(height=250)
+        if upload_type == 'Text Input':
+            user_input = st.text_area('Enter text for analysis')
+            if st.button('Analyze'):
+                if user_input:
+                    result = analyze_text(user_input, analysis_type)
+                    result_df = pd.DataFrame([{'text': user_input, 'analysis': result}])
+                    display_dashboard(result_df)
+                else:
+                    st.error('Please enter text to analyze')
+        elif upload_type == 'CSV File':
+            uploaded_file = st.file_uploader('Upload a CSV file', type='csv')
+            if uploaded_file:
+                data = pd.read_csv(uploaded_file)
+                if 'text' in data.columns:
+                    # Fill missing values in 'text' column with empty strings
+                    data['text'] = data['text'].fillna('')
+                    data['analysis'] = data['text'].apply(lambda x: analyze_text(x, analysis_type))
+                    display_dashboard(data)
 
-    performance_col = st.columns((2, 0.2, 3))
-    with performance_col[0]:
-        st.header('Model performance', divider='rainbow')
-        st.dataframe(rf_results.T.reset_index().rename(columns={'index': 'Parameter', 0: 'Value'}))
-    with performance_col[2]:
-        st.header('Feature importance', divider='rainbow')
-        st.altair_chart(bars, theme='streamlit', use_container_width=True)
+                    # Show Dataset
+                    if st.checkbox("Preview Dataset"):
+                        if st.button("Head"):
+                            st.write(data.head())
+                        if st.button("Tail"):
+                            st.write(data.tail())
+                        if st.button("Information"):
+                            st.write(data.info())
+                        if st.button("Shape"):
+                            st.write(data.shape)
+                        if st.button("Describe"):
+                            st.write(data.describe())
 
-    # Prediction results
-    st.header('Prediction results', divider='rainbow')
-    s_y_train = pd.Series(y_train, name='actual').reset_index(drop=True)
-    s_y_train_pred = pd.Series(y_train_pred, name='predicted').reset_index(drop=True)
-    df_train = pd.DataFrame(data=[s_y_train, s_y_train_pred], index=None).T
-    df_train['class'] = 'train'
-        
-    s_y_test = pd.Series(y_test, name='actual').reset_index(drop=True)
-    s_y_test_pred = pd.Series(y_test_pred, name='predicted').reset_index(drop=True)
-    df_test = pd.DataFrame(data=[s_y_test, s_y_test_pred], index=None).T
-    df_test['class'] = 'test'
-    
-    df_prediction = pd.concat([df_train, df_test], axis=0)
-    
-    prediction_col = st.columns((2, 0.2, 3))
-    
-    # Display dataframe
-    with prediction_col[0]:
-        st.dataframe(df_prediction, height=320, use_container_width=True)
+                    # Check DataType of Each Column
+                    if st.checkbox("DataType of Each Column"):
+                        st.text("DataTypes")
+                        st.write(data.dtypes)
 
-    # Display scatter plot of actual vs predicted values
-    with prediction_col[2]:
-        scatter = alt.Chart(df_prediction).mark_circle(size=60).encode(
-                        x='actual',
-                        y='predicted',
-                        color='class'
-                  )
-        st.altair_chart(scatter, theme='streamlit', use_container_width=True)
+                    # Find Shape of Our Dataset (Number of Rows And Number of Columns)
+                    data_shape = st.radio("What Dimension Do You Want To Check?", ('Rows', 'Columns'))
+                    if data_shape == 'Rows':
+                        st.text("Number of Rows")
+                        st.write(data.shape[0])
+                    elif data_shape == 'Columns':
+                        st.text("Number of Columns")
+                        st.write(data.shape[1])
 
-    
-# Ask for CSV upload if none is detected
-else:
-    st.warning('👈 Upload a CSV file or click *"Load example data"* to get started!')
+                    # Find Null Values in The Dataset and Handle Them
+                    if data.isnull().values.any():
+                        st.warning("This Dataset Contains Some Null Values")
+                        handle_null = st.selectbox("Do You Want to Remove or Fill Null Values?", ("Select One", "Remove", "Fill"))
+                        if handle_null == "Remove":
+                            data = data.dropna()
+                            st.text("Null Values are Removed")
+                        elif handle_null == "Fill":
+                            fill_value = st.text_input("Enter the value to replace null values:")
+                            if st.button("Fill Null Values"):
+                                data = data.fillna(fill_value)
+                                st.text("Null Values are Filled")
+                    else:
+                        st.success("No Missing Values")
+                else:
+                    st.error('CSV file must contain a "text" column')
+
+    main()
