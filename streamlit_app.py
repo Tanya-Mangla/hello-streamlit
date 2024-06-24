@@ -113,6 +113,7 @@ if st.session_state['logged_in']:
             - For 'CSV File', upload a CSV file containing a 'text' column for analysis.
             - After analysis, explore the results, statistics, and charts.
             - You can also download the results as a CSV file.
+            
               Made By TANYA MANGLA
             """
         )
