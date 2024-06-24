@@ -114,7 +114,7 @@ if st.session_state['logged_in']:
             - After analysis, explore the results, statistics, and charts.
             - You can also download the results as a CSV file.
             
-                             Made By TANYA MANGLA
+                             Made By: TANYA MANGLA
             """
         )
 
