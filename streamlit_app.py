@@ -102,7 +102,7 @@ if st.session_state['logged_in']:
             "This is a text analysis app that allows you to perform sentiment analysis "
             "and emotion analysis on text data. You can choose the analysis type and "
             "upload text either manually or via a CSV file. After analysis, the results "
-            "will be displayed along with statistical information and visualizations."
+            "will be displayed along with statistical information and visualizations.Where efforts made by Tanya Mangla"
         )
         st.sidebar.subheader('How to Use')
         st.sidebar.markdown(
@@ -113,6 +113,7 @@ if st.session_state['logged_in']:
             - For 'CSV File', upload a CSV file containing a 'text' column for analysis.
             - After analysis, explore the results, statistics, and charts.
             - You can also download the results as a CSV file.
+            - Made By TANYA MANGLA
             """
         )
 
