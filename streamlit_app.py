@@ -32,10 +32,7 @@ def authenticate(username, password):
 # Function for sign-up (save user credentials)
 def signup(username, password):
     st.session_state['users'][username] = password
-
-# Initialize session state for users if not already done
-if 'users' not in st.session_state:
-    st.session_state['users'] = {}
+    save_users(st.session_state['users'])
 
 # Initialize session state for login status
 if 'logged_in' not in st.session_state:
@@ -120,7 +117,7 @@ if st.session_state['logged_in']:
             "This is a text analysis app that allows you to perform sentiment analysis "
             "and emotion analysis on text data. You can choose the analysis type and "
             "upload text either manually or via a CSV file. After analysis, the results "
-            "will be displayed along with statistical information and visualizations.Where efforts made by Tanya Mangla"
+            "will be displayed along with statistical information and visualizations."
         )
         st.sidebar.subheader('How to Use')
         st.sidebar.markdown(
@@ -131,8 +128,6 @@ if st.session_state['logged_in']:
             - For 'CSV File', upload a CSV file containing a 'text' column for analysis.
             - After analysis, explore the results, statistics, and charts.
             - You can also download the results as a CSV file.
-            
-                             Made By: TANYA MANGLA
             """
         )
 
