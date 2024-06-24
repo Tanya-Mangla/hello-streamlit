@@ -3,9 +3,27 @@ import pandas as pd
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 import matplotlib.pyplot as plt
+import openpyxl
 
 # Ensure you have the NLTK data
 nltk.download('vader_lexicon')
+
+# Function to load users from Excel
+def load_users():
+    try:
+        users_df = pd.read_excel('users.xlsx', engine='openpyxl')
+        return dict(zip(users_df['username'], users_df['password']))
+    except FileNotFoundError:
+        return {}
+
+# Function to save users to Excel
+def save_users(users):
+    users_df = pd.DataFrame(users.items(), columns=['username', 'password'])
+    users_df.to_excel('users.xlsx', index=False, engine='openpyxl')
+
+# Load users into session state
+if 'users' not in st.session_state:
+    st.session_state['users'] = load_users()
 
 # Function for authenticating user
 def authenticate(username, password):
@@ -14,10 +32,7 @@ def authenticate(username, password):
 # Function for sign-up (save user credentials)
 def signup(username, password):
     st.session_state['users'][username] = password
-
-# Initialize session state for users if not already done
-if 'users' not in st.session_state:
-    st.session_state['users'] = {}
+    save_users(st.session_state['users'])
 
 # Initialize session state for login status
 if 'logged_in' not in st.session_state:
